@@ -12,16 +12,28 @@
         header h1 { margin: 0; font-size: 20px; }
 
         .container { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
-        .actions-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+        
+        /* Controls & Filter Bar */
+        .controls-bar { display: flex; flex-wrap: wrap; gap: 12px; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+        .search-filter-group { display: flex; flex-wrap: wrap; gap: 10px; flex-grow: 1; max-width: 700px; }
+        
+        .input-control { padding: 10px 14px; border: 1px solid #ccc; border-radius: 6px; font-size: 14px; outline: none; }
+        .input-control:focus { border-color: #003366; }
+        .search-box { flex-grow: 1; min-width: 200px; }
+        .category-filter { width: 220px; }
 
-        .btn { padding: 10px 16px; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; text-decoration: none; display: inline-block; }
+        .btn { padding: 10px 16px; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; text-decoration: none; display: inline-block; transition: background 0.2s; }
         .btn-primary { background-color: #003366; color: white; }
+        .btn-primary:hover { background-color: #002244; }
         .btn-danger { background-color: #dc3545; color: white; font-size: 12px; padding: 6px 12px; }
+        .btn-danger:hover { background-color: #bd2130; }
         .btn-secondary { background-color: #e9ecef; color: #333; }
 
         table { width: 100%; border-collapse: collapse; margin-top: 10px; }
         th, td { border-bottom: 1px solid #eee; padding: 12px; text-align: left; }
         th { background-color: #f8f9fa; color: #555; }
+        
+        .badge { background: #e2e8f0; color: #334155; padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: 600; display: inline-block; }
 
         /* Modal Styles */
         .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); align-items: center; justify-content: center; z-index: 1000; }
@@ -40,8 +52,23 @@
     </header>
 
     <div class="container">
-        <div class="actions-bar">
-            <h2>Document Records</h2>
+        <!-- Search & Category Filters Bar -->
+        <div class="controls-bar">
+            <div class="search-filter-group">
+                <input type="text" id="searchInput" class="input-control search-box" placeholder="🔍 Search records by title or notes..." oninput="filterRecords()">
+                
+                <select id="categoryFilter" class="input-control category-filter" onchange="filterRecords()">
+                    <option value="ALL">📁 All Categories</option>
+                    <option value="Routes & Franchises">Routes & Franchises</option>
+                    <option value="GIS Traffic & Accidents">GIS Traffic & Accidents</option>
+                    <option value="EV Charging Stations">EV Charging Stations</option>
+                    <option value="Libreng Sakay Program">Libreng Sakay Program</option>
+                    <option value="Scholar & Shuttle Data">Scholar & Shuttle Data</option>
+                    <option value="Transport Operator Register">Transport Operator Register</option>
+                    <option value="Express EV & Transport">Express EV & Transport</option>
+                </select>
+            </div>
+
             <button class="btn btn-primary" onclick="openUploadModal()">+ Add New File Record</button>
         </div>
 
@@ -74,6 +101,7 @@
                         <option value="Libreng Sakay Program">Libreng Sakay Program</option>
                         <option value="Scholar & Shuttle Data">Scholar & Shuttle Data</option>
                         <option value="Transport Operator Register">Transport Operator Register</option>
+                        <option value="Express EV & Transport">Express EV & Transport</option>
                     </select>
                 </div>
 
@@ -101,8 +129,8 @@
     </div>
 
 <script>
-    // Relative routes automatically bind to your deployed domain (no localhost)
     const API_URL = '/api/records';
+    let allRecords = []; // Cache all fetched records locally for instant searching
 
     document.addEventListener('DOMContentLoaded', fetchRecords);
 
@@ -119,36 +147,56 @@
     async function fetchRecords() {
         try {
             const res = await fetch(API_URL);
-            const records = await res.json();
-            const tableBody = document.getElementById('recordsTableBody');
-            tableBody.innerHTML = '';
-
-            if (!records || records.length === 0) {
-                tableBody.innerHTML = '<tr><td colspan="6" style="text-align:center; color:#888;">No records found.</td></tr>';
-                return;
-            }
-
-            records.forEach(record => {
-                const row = document.createElement('tr');
-                row.innerHTML = `
-                    <td><strong>${record.category}</strong></td>
-                    <td>${record.title}</td>
-                    <td>${record.details || ''}</td>
-                    <td>${record.date}</td>
-                    <td>
-                        ${record.filePath && record.filePath !== '#' 
-                            ? `<a href="${record.filePath}" target="_blank" style="color:#003366; font-weight:bold;">📎 ${record.fileName}</a>` 
-                            : '<span style="color:#aaa;">No File</span>'}
-                    </td>
-                    <td>
-                        <button onclick="deleteRecord(${record.id})" class="btn btn-danger">Delete</button>
-                    </td>
-                `;
-                tableBody.appendChild(row);
-            });
+            allRecords = await res.json();
+            renderTable(allRecords);
         } catch (error) {
             console.error('Error fetching records:', error);
         }
+    }
+
+    // Filter Records (Instant Search & Category Filter)
+    function filterRecords() {
+        const searchText = document.getElementById('searchInput').value.toLowerCase();
+        const selectedCategory = document.getElementById('categoryFilter').value;
+
+        const filtered = allRecords.filter(record => {
+            const matchesCategory = (selectedCategory === 'ALL') || (record.category === selectedCategory);
+            const matchesSearch = record.title.toLowerCase().includes(searchText) || 
+                                  (record.details && record.details.toLowerCase().includes(searchText));
+            return matchesCategory && matchesSearch;
+        });
+
+        renderTable(filtered);
+    }
+
+    // Render Table Content
+    function renderTable(records) {
+        const tableBody = document.getElementById('recordsTableBody');
+        tableBody.innerHTML = '';
+
+        if (!records || records.length === 0) {
+            tableBody.innerHTML = '<tr><td colspan="6" style="text-align:center; color:#888; padding: 20px;">No matching records found.</td></tr>';
+            return;
+        }
+
+        records.forEach(record => {
+            const row = document.createElement('tr');
+            row.innerHTML = `
+                <td><span class="badge">${record.category}</span></td>
+                <td><strong>${record.title}</strong></td>
+                <td>${record.details || '-'}</td>
+                <td>${record.date}</td>
+                <td>
+                    ${record.filePath && record.filePath !== '#' 
+                        ? `<a href="${record.filePath}" target="_blank" style="color:#003366; font-weight:bold;">📎 ${record.fileName}</a>` 
+                        : '<span style="color:#aaa;">No File</span>'}
+                </td>
+                <td>
+                    <button onclick="deleteRecord(${record.id})" class="btn btn-danger">Delete</button>
+                </td>
+            `;
+            tableBody.appendChild(row);
+        });
     }
 
     // Upload Record + File
