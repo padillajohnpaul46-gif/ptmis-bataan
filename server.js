@@ -8,30 +8,34 @@ const sqlite3 = require('sqlite3').verbose();
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// 1. Enable CORS & JSON Parsing
+// Force browser to NEVER cache old index.html files
+app.use((req, res, next) => {
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
+    next();
+});
+
 app.use(cors());
 app.use(express.json());
 app.use(express.static(__dirname));
 
-// 2. Setup Upload Directory in /tmp for Cloud Host Compatibility
+// Use /tmp/uploads for cloud host compatibility (Render)
 const uploadDir = path.join('/tmp', 'uploads');
 if (!fs.existsSync(uploadDir)) {
     fs.mkdirSync(uploadDir, { recursive: true });
 }
-
-// Serve uploaded static files from /uploads route
 app.use('/uploads', express.static(uploadDir));
 
-// 3. Connect to SQLite Database
+// SQLite Database Setup
 const db = new sqlite3.Database('./ptmis.db', (err) => {
     if (err) {
         console.error('Database connection error:', err);
     } else {
-        console.log('📂 Connected to SQLite database (ptmis.db)');
+        console.log('📂 Connected to SQLite database');
     }
 });
 
-// Create Documents Table if not exists
 db.run(`
     CREATE TABLE IF NOT EXISTS documents (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -44,19 +48,17 @@ db.run(`
     )
 `);
 
-// 4. Multer Configuration (10MB File Size Limit)
+// Multer Storage Configuration
 const storage = multer.diskStorage({
     destination: (req, file, cb) => cb(null, uploadDir),
     filename: (req, file, cb) => cb(null, Date.now() + '-' + file.originalname)
 });
 const upload = multer({ 
     storage,
-    limits: { fileSize: 10 * 1024 * 1024 } 
+    limits: { fileSize: 10 * 1024 * 1024 } // 10MB limit
 });
 
-// 5. API Endpoints
-
-// GET: Fetch all records
+// API Routes
 app.get('/api/records', (req, res) => {
     db.all('SELECT * FROM documents ORDER BY id DESC', [], (err, rows) => {
         if (err) return res.status(500).json({ error: err.message });
@@ -64,7 +66,6 @@ app.get('/api/records', (req, res) => {
     });
 });
 
-// POST: Add new record + file upload
 app.post('/api/records', upload.single('file'), (req, res) => {
     const { category, title, details } = req.body;
     const file = req.file;
@@ -80,7 +81,6 @@ app.post('/api/records', upload.single('file'), (req, res) => {
     });
 });
 
-// DELETE: Delete record and file
 app.delete('/api/records/:id', (req, res) => {
     const recordId = req.params.id;
 
@@ -102,12 +102,10 @@ app.delete('/api/records/:id', (req, res) => {
     });
 });
 
-// Fallback route to serve index.html
 app.get('*', (req, res) => {
     res.sendFile(path.join(__dirname, 'index.html'));
 });
 
-// Start Server on 0.0.0.0
 app.listen(PORT, '0.0.0.0', () => {
     console.log(`🚀 Server running on port ${PORT}`);
 });
