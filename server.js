@@ -6,7 +6,9 @@ const fs = require('fs');
 const sqlite3 = require('sqlite3').verbose();
 
 const app = express();
-const PORT = 3000;
+
+// Use process.env.PORT for cloud deployment (Render, Railway, etc.), fallback to 3000 locally
+const PORT = process.env.PORT || 3000;
 
 app.use(cors());
 app.use(express.json());
@@ -96,5 +98,5 @@ app.delete('/api/records/:id', (req, res) => {
 });
 
 app.listen(PORT, '0.0.0.0', () => {
-    console.log(`🚀 PTMIS Server is running locally at http://localhost:${PORT}`);
+    console.log(`🚀 PTMIS Server is running on port ${PORT}`);
 });
