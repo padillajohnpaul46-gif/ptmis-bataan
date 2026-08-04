@@ -3,86 +3,128 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PTMIS Bataan - Document Management</title>
+    <title>PTMIS - Provincial Transport Storage & Document Registry</title>
     <style>
-        body { font-family: Arial, sans-serif; margin: 30px; background-color: #f4f7f6; }
-        .container { max-width: 900px; margin: 0 auto; background: white; padding: 25px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
-        h2 { color: #003366; }
+        * { box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        body { margin: 0; padding: 20px; background-color: #f4f7f6; color: #333; }
+        
+        header { display: flex; justify-content: space-between; align-items: center; background: #003366; color: white; padding: 15px 25px; border-radius: 8px; margin-bottom: 20px; }
+        header h1 { margin: 0; font-size: 20px; }
+        header span { font-size: 14px; opacity: 0.8; }
+
+        .container { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+        .actions-bar { display: flex; justify-content: space-between; margin-bottom: 20px; }
+
+        .btn { padding: 10px 16px; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; text-decoration: none; display: inline-block; }
+        .btn-primary { background-color: #003366; color: white; }
+        .btn-primary:hover { background-color: #002244; }
+        .btn-danger { background-color: #dc3545; color: white; font-size: 12px; padding: 6px 12px; }
+        .btn-secondary { background-color: #e9ecef; color: #333; }
+
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+        th, td { border-bottom: 1px solid #eee; padding: 12px; text-align: left; }
+        th { background-color: #f8f9fa; color: #555; }
+
+        /* Modal Styles */
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); align-items: center; justify-content: center; z-index: 1000; }
+        .modal-content { background: white; padding: 25px; border-radius: 12px; width: 100%; max-width: 500px; box-shadow: 0 4px 15px rgba(0,0,0,0.2); }
         .form-group { margin-bottom: 15px; }
-        label { display: block; font-weight: bold; margin-bottom: 5px; }
-        input[type="text"], select, textarea { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
-        button { background-color: #003366; color: white; padding: 10px 20px; border: none; border-radius: 4px; cursor: pointer; font-size: 16px; }
-        button:hover { background-color: #002244; }
-        table { width: 100%; border-collapse: collapse; margin-top: 25px; }
-        th, td { border: 1px solid #ddd; padding: 10px; text-align: left; }
-        th { background-color: #003366; color: white; }
-        .btn-delete { background-color: #cc0000; padding: 5px 10px; font-size: 12px; }
-        .btn-delete:hover { background-color: #990000; }
+        .form-group label { display: block; font-weight: bold; margin-bottom: 5px; font-size: 14px; }
+        .form-group input, .form-group select, .form-group textarea { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 6px; }
+        .modal-buttons { display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; }
     </style>
 </head>
 <body>
 
-<div class="container">
-    <h2>Add New Record & Attach File</h2>
-    
-    <form id="uploadForm">
-        <div class="form-group">
-            <label for="category">Category</label>
-            <select id="category" required>
-                <option value="Routes & Franchises">Routes & Franchises</option>
-                <option value="Traffic Management">Traffic Management</option>
-                <option value="Permits & Clearances">Permits & Clearances</option>
-                <option value="Reports & Documents">Reports & Documents</option>
-            </select>
+    <header>
+        <div>
+            <h1>🏛️ PTMIS - Provincial Transport Storage & Document Registry</h1>
+        </div>
+        <div>
+            <span>Bataan Provincial Government</span>
+        </div>
+    </header>
+
+    <div class="container">
+        <div class="actions-bar">
+            <h2>Document Records</h2>
+            <button class="btn btn-primary" onclick="openUploadModal()">+ Add New File Record</button>
         </div>
 
-        <div class="form-group">
-            <label for="title">Document Title</label>
-            <input type="text" id="title" placeholder="Enter title" required>
+        <table>
+            <thead>
+                <tr>
+                    <th>Category</th>
+                    <th>Document Title</th>
+                    <th>Details / Notes</th>
+                    <th>Date</th>
+                    <th>Attached File</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody id="recordsTableBody">
+                <!-- Dynamically loaded rows -->
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Upload Modal -->
+    <div class="modal" id="uploadModal">
+        <div class="modal-content">
+            <h3 style="margin-top:0;">Add New Record & Attach File</h3>
+            <form id="uploadForm" onsubmit="uploadRecord(event)">
+                <div class="form-group">
+                    <label>Category</label>
+                    <select id="modalCategory" required>
+                        <option value="Routes & Franchises">Routes & Franchises</option>
+                        <option value="GIS Traffic & Accidents">GIS Traffic & Accidents</option>
+                        <option value="EV Charging Stations">EV Charging Stations</option>
+                        <option value="Libreng Sakay Program">Libreng Sakay Program</option>
+                        <option value="Scholar & Shuttle Data">Scholar & Shuttle Data</option>
+                        <option value="Transport Operator Register">Transport Operator Register</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label>Document Title</label>
+                    <input type="text" id="modalTitle" placeholder="Enter title" required>
+                </div>
+
+                <div class="form-group">
+                    <label>Details / Notes</label>
+                    <textarea id="modalDetails" rows="3" placeholder="Enter details"></textarea>
+                </div>
+
+                <div class="form-group">
+                    <label>Attach File (PDF, Excel, Word, Image)</label>
+                    <input type="file" id="modalFile">
+                </div>
+
+                <div class="modal-buttons">
+                    <button type="button" class="btn btn-secondary" onclick="closeUploadModal()">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Save & Upload</button>
+                </div>
+            </form>
         </div>
-
-        <div class="form-group">
-            <label for="details">Details / Notes</label>
-            <textarea id="details" rows="3" placeholder="Enter details"></textarea>
-        </div>
-
-        <div class="form-group">
-            <label for="fileInput">Attach File (PDF, Excel, Word, Image)</label>
-            <input type="file" id="fileInput">
-        </div>
-
-        <button type="submit">Save & Upload</button>
-    </form>
-
-    <hr style="margin-top: 30px;">
-
-    <h2>Document Records</h2>
-    <table>
-        <thead>
-            <tr>
-                <th>Category</th>
-                <th>Title</th>
-                <th>Details</th>
-                <th>Date</th>
-                <th>File</th>
-                <th>Action</th>
-            </tr>
-        </thead>
-        <tbody id="recordsTableBody">
-            <!-- Records dynamically populated here -->
-        </tbody>
-    </table>
-</div>
+    </div>
 
 <script>
-    // Live Render Endpoint
     const API_URL = 'https://ptmis-bataan.onrender.com/api/records';
     const BASE_URL = 'https://ptmis-bataan.onrender.com';
 
     document.addEventListener('DOMContentLoaded', fetchRecords);
-    document.getElementById('uploadForm').addEventListener('submit', uploadRecord);
 
-    // 1. Fetch & Display Records
+    // Modal Control Functions
+    function openUploadModal() {
+        document.getElementById('uploadModal').style.display = 'flex';
+    }
+
+    function closeUploadModal() {
+        document.getElementById('uploadModal').style.display = 'none';
+        document.getElementById('uploadForm').reset();
+    }
+
+    // 1. Fetch & Display All Records
     async function fetchRecords() {
         try {
             const res = await fetch(API_URL);
@@ -90,20 +132,25 @@
             const tableBody = document.getElementById('recordsTableBody');
             tableBody.innerHTML = '';
 
+            if (!records || records.length === 0) {
+                tableBody.innerHTML = '<tr><td colspan="6" style="text-align:center; color:#888;">No records found in this category.</td></tr>';
+                return;
+            }
+
             records.forEach(record => {
                 const row = document.createElement('tr');
                 row.innerHTML = `
-                    <td>${record.category}</td>
+                    <td><strong>${record.category}</strong></td>
                     <td>${record.title}</td>
                     <td>${record.details || ''}</td>
                     <td>${record.date}</td>
                     <td>
-                        ${record.filePath !== '#' 
-                            ? `<a href="${BASE_URL}${record.filePath}" target="_blank">${record.fileName}</a>` 
-                            : 'No File'}
+                        ${record.filePath && record.filePath !== '#' 
+                            ? `<a href="${BASE_URL}${record.filePath}" target="_blank" style="color:#003366; font-weight:bold;">📎 ${record.fileName}</a>` 
+                            : '<span style="color:#aaa;">No File</span>'}
                     </td>
                     <td>
-                        <button onclick="deleteRecord(${record.id})" class="btn-delete">Delete</button>
+                        <button onclick="deleteRecord(${record.id})" class="btn btn-danger">Delete</button>
                     </td>
                 `;
                 tableBody.appendChild(row);
@@ -115,12 +162,17 @@
 
     // 2. Upload Record + File
     async function uploadRecord(event) {
-        event.preventDefault();
+        event.preventDefault(); // Prevents instant page reload!
 
-        const category = document.getElementById('category').value;
-        const title = document.getElementById('title').value;
-        const details = document.getElementById('details').value;
-        const fileInput = document.getElementById('fileInput');
+        const category = document.getElementById('modalCategory').value;
+        const title = document.getElementById('modalTitle').value;
+        const details = document.getElementById('modalDetails').value;
+        const fileInput = document.getElementById('modalFile');
+
+        if (!title) {
+            alert('Please enter a Document Title.');
+            return;
+        }
 
         const formData = new FormData();
         formData.append('category', category);
@@ -132,23 +184,24 @@
         }
 
         try {
+            console.log('Uploading payload to Render server...');
             const response = await fetch(API_URL, {
                 method: 'POST',
-                body: formData // Note: Browser sets multipart/form-data content-type automatically
+                body: formData
             });
 
             const result = await response.json();
 
             if (result.success) {
                 alert('Record and file uploaded successfully!');
-                document.getElementById('uploadForm').reset();
+                closeUploadModal();
                 fetchRecords();
             } else {
-                alert('Upload failed: ' + (result.error || 'Unknown error'));
+                alert('Upload failed: ' + (result.error || 'Unknown server error'));
             }
         } catch (error) {
-            console.error('Error uploading:', error);
-            alert('Upload failed due to network error.');
+            console.error('Error during upload:', error);
+            alert('Upload failed due to a network connection error.');
         }
     }
 
@@ -168,7 +221,7 @@
                 alert('Delete failed: ' + result.error);
             }
         } catch (error) {
-            console.error('Error deleting:', error);
+            console.error('Error deleting record:', error);
         }
     }
 </script>

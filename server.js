@@ -8,19 +8,21 @@ const sqlite3 = require('sqlite3').verbose();
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Enable CORS & JSON handling
+// 1. Enable CORS & JSON Parsing
 app.use(cors());
 app.use(express.json());
 app.use(express.static(__dirname));
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
-// Ensure 'uploads' directory exists
-const uploadDir = path.join(__dirname, 'uploads');
+// 2. Setup Upload Directory in /tmp for Cloud Host Compatibility
+const uploadDir = path.join('/tmp', 'uploads');
 if (!fs.existsSync(uploadDir)) {
-    fs.mkdirSync(uploadDir);
+    fs.mkdirSync(uploadDir, { recursive: true });
 }
 
-// Connect to SQLite Database
+// Serve uploaded static files from /uploads route
+app.use('/uploads', express.static(uploadDir));
+
+// 3. Connect to SQLite Database
 const db = new sqlite3.Database('./ptmis.db', (err) => {
     if (err) {
         console.error('Database connection error:', err);
@@ -29,7 +31,7 @@ const db = new sqlite3.Database('./ptmis.db', (err) => {
     }
 });
 
-// Create Table
+// Create Documents Table if not exists
 db.run(`
     CREATE TABLE IF NOT EXISTS documents (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -42,14 +44,19 @@ db.run(`
     )
 `);
 
-// Multer Storage Configuration
+// 4. Multer Configuration (10MB File Size Limit)
 const storage = multer.diskStorage({
-    destination: (req, file, cb) => cb(null, 'uploads/'),
+    destination: (req, file, cb) => cb(null, uploadDir),
     filename: (req, file, cb) => cb(null, Date.now() + '-' + file.originalname)
 });
-const upload = multer({ storage });
+const upload = multer({ 
+    storage,
+    limits: { fileSize: 10 * 1024 * 1024 } 
+});
 
-// API: Get All Records
+// 5. API Endpoints
+
+// GET: Fetch all records
 app.get('/api/records', (req, res) => {
     db.all('SELECT * FROM documents ORDER BY id DESC', [], (err, rows) => {
         if (err) return res.status(500).json({ error: err.message });
@@ -57,7 +64,7 @@ app.get('/api/records', (req, res) => {
     });
 });
 
-// API: Upload Record + File
+// POST: Add new record + file upload
 app.post('/api/records', upload.single('file'), (req, res) => {
     const { category, title, details } = req.body;
     const file = req.file;
@@ -73,7 +80,7 @@ app.post('/api/records', upload.single('file'), (req, res) => {
     });
 });
 
-// API: Delete Record & File
+// DELETE: Delete record and file
 app.delete('/api/records/:id', (req, res) => {
     const recordId = req.params.id;
 
@@ -81,7 +88,8 @@ app.delete('/api/records/:id', (req, res) => {
         if (err) return res.status(500).json({ error: err.message });
 
         if (row && row.filePath && row.filePath !== '#') {
-            const fullFilePath = path.join(__dirname, row.filePath);
+            const actualFileName = path.basename(row.filePath);
+            const fullFilePath = path.join(uploadDir, actualFileName);
             if (fs.existsSync(fullFilePath)) {
                 fs.unlinkSync(fullFilePath);
             }
@@ -94,12 +102,12 @@ app.delete('/api/records/:id', (req, res) => {
     });
 });
 
-// Serve index.html at root route
-app.get('/', (req, res) => {
+// Fallback route to serve index.html
+app.get('*', (req, res) => {
     res.sendFile(path.join(__dirname, 'index.html'));
 });
 
-// Start Server on 0.0.0.0 for Render host
+// Start Server on 0.0.0.0
 app.listen(PORT, '0.0.0.0', () => {
-    console.log(`🚀 PTMIS Server running on port ${PORT}`);
+    console.log(`🚀 Server running on port ${PORT}`);
 });
