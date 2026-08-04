@@ -102,8 +102,8 @@ app.delete('/api/records/:id', (req, res) => {
     });
 });
 
-// ✅ Express 5 safe fallback catch-all route syntax:
-app.get('(.*)', (req, res) => {
+// Express 5 named wildcard fallback route
+app.get('/{*splat}', (req, res) => {
     res.sendFile(path.join(__dirname, 'index.html'));
 });
 
