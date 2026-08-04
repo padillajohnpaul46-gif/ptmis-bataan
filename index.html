@@ -22,12 +22,16 @@
         .search-box { flex-grow: 1; min-width: 200px; }
         .category-filter { width: 220px; }
 
-        .btn { padding: 10px 16px; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; text-decoration: none; display: inline-block; transition: background 0.2s; }
+        .btn { padding: 10px 16px; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; text-decoration: none; display: inline-flex; align-items: center; gap: 5px; transition: background 0.2s; font-size: 14px; }
         .btn-primary { background-color: #003366; color: white; }
         .btn-primary:hover { background-color: #002244; }
+        .btn-success { background-color: #28a745; color: white; }
+        .btn-success:hover { background-color: #218838; }
+        .btn-info { background-color: #17a2b8; color: white; }
+        .btn-info:hover { background-color: #138496; }
         .btn-danger { background-color: #dc3545; color: white; font-size: 12px; padding: 6px 12px; }
         .btn-danger:hover { background-color: #bd2130; }
-        .btn-secondary { background-color: #e9ecef; color: #333; }
+        .btn-secondary { background-color: #6c757d; color: white; }
 
         table { width: 100%; border-collapse: collapse; margin-top: 10px; }
         th, td { border-bottom: 1px solid #eee; padding: 12px; text-align: left; }
@@ -35,13 +39,22 @@
         
         .badge { background: #e2e8f0; color: #334155; padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: 600; display: inline-block; }
 
-        /* Modal Styles */
-        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); align-items: center; justify-content: center; z-index: 1000; }
+        /* Modal Base Styles */
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); align-items: center; justify-content: center; z-index: 1000; }
         .modal-content { background: white; padding: 25px; border-radius: 12px; width: 100%; max-width: 450px; box-shadow: 0 4px 15px rgba(0,0,0,0.2); }
         .form-group { margin-bottom: 15px; }
         .form-group label { display: block; font-weight: bold; margin-bottom: 5px; font-size: 14px; }
         .form-group input, .form-group select, .form-group textarea { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 6px; }
         .modal-buttons { display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; }
+
+        /* Fullscreen In-Dashboard File Viewer Modal */
+        .viewer-content { background: white; border-radius: 12px; width: 90%; height: 90%; max-width: 1200px; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 5px 25px rgba(0,0,0,0.3); }
+        .viewer-header { background: #003366; color: white; padding: 15px 20px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; }
+        .viewer-actions { display: flex; gap: 10px; align-items: center; }
+        .viewer-body { flex-grow: 1; width: 100%; height: 100%; background: #eef2f5; display: flex; justify-content: center; align-items: center; overflow: auto; }
+        .viewer-body iframe, .viewer-body img { width: 100%; height: 100%; border: none; object-fit: contain; }
+        
+        .file-link { color: #003366; font-weight: bold; cursor: pointer; text-decoration: underline; }
     </style>
 </head>
 <body>
@@ -128,9 +141,27 @@
         </div>
     </div>
 
+    <!-- In-App File Viewer Modal with View / Print / Download Controls -->
+    <div class="modal" id="fileViewerModal">
+        <div class="viewer-content">
+            <div class="viewer-header">
+                <span id="viewerTitle" style="font-weight: bold; font-size: 16px;">📄 File Options</span>
+                <div class="viewer-actions">
+                    <button class="btn btn-info" onclick="printActiveFile()">🖨️ Print</button>
+                    <a id="downloadDirectBtn" href="#" class="btn btn-success" download>⬇️ Download</a>
+                    <button class="btn btn-secondary" onclick="closeFileViewer()">← Back to Dashboard</button>
+                </div>
+            </div>
+            <div class="viewer-body" id="viewerContainer">
+                <!-- Preview content dynamically loaded here -->
+            </div>
+        </div>
+    </div>
+
 <script>
     const API_URL = '/api/records';
-    let allRecords = []; // Cache all fetched records locally for instant searching
+    let allRecords = [];
+    let currentActiveFile = { url: '', name: '', type: '' };
 
     document.addEventListener('DOMContentLoaded', fetchRecords);
 
@@ -141,6 +172,79 @@
     function closeUploadModal() {
         document.getElementById('uploadModal').style.display = 'none';
         document.getElementById('uploadForm').reset();
+    }
+
+    // In-App File Preview Handler
+    function viewFile(filePath, fileName) {
+        const viewerModal = document.getElementById('fileViewerModal');
+        const viewerTitle = document.getElementById('viewerTitle');
+        const viewerContainer = document.getElementById('viewerContainer');
+        const downloadBtn = document.getElementById('downloadDirectBtn');
+
+        const ext = fileName.split('.').pop().toLowerCase();
+        currentActiveFile = { url: filePath, name: fileName, type: ext };
+
+        viewerTitle.textContent = `📄 File: ${fileName}`;
+        downloadBtn.href = filePath;
+        downloadBtn.setAttribute('download', fileName);
+
+        // Render preview depending on file type
+        if (['jpg', 'jpeg', 'png', 'gif', 'webp', 'avif'].includes(ext)) {
+            viewerContainer.innerHTML = `<img id="previewImage" src="${filePath}" alt="Document Preview">`;
+        } else if (ext === 'pdf') {
+            viewerContainer.innerHTML = `<iframe id="previewIframe" src="${filePath}"></iframe>`;
+        } else {
+            // Word / Excel / non-embeddable formats
+            viewerContainer.innerHTML = `
+                <div style="text-align: center; padding: 40px; background: white; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
+                    <h3>📁 ${fileName}</h3>
+                    <p style="color:#666;">This file format (.${ext}) cannot be directly previewed inside the web frame.</p>
+                    <div style="display: flex; gap: 10px; justify-content: center; margin-top: 15px;">
+                        <a href="${filePath}" download class="btn btn-success">⬇️ Download File</a>
+                    </div>
+                </div>
+            `;
+        }
+
+        viewerModal.style.display = 'flex';
+    }
+
+    // Print Handler
+    function printActiveFile() {
+        if (!currentActiveFile.url) return;
+
+        const ext = currentActiveFile.type;
+
+        if (['jpg', 'jpeg', 'png', 'gif', 'webp', 'avif'].includes(ext)) {
+            // Print image in dedicated window
+            const printWin = window.open('', '_blank');
+            printWin.document.write(`
+                <html>
+                    <head><title>Print ${currentActiveFile.name}</title></head>
+                    <body style="margin:0; display:flex; justify-content:center; align-items:center;">
+                        <img src="${currentActiveFile.url}" style="max-width:100%; max-height:100vh;" onload="window.print(); window.close();"/>
+                    </body>
+                </html>
+            `);
+            printWin.document.close();
+        } else if (ext === 'pdf') {
+            // Print PDF via iframe
+            const iframe = document.getElementById('previewIframe');
+            if (iframe) {
+                iframe.contentWindow.focus();
+                iframe.contentWindow.print();
+            } else {
+                window.open(currentActiveFile.url, '_blank');
+            }
+        } else {
+            alert('To print this document type, please download it first.');
+        }
+    }
+
+    function closeFileViewer() {
+        document.getElementById('fileViewerModal').style.display = 'none';
+        document.getElementById('viewerContainer').innerHTML = '';
+        currentActiveFile = { url: '', name: '', type: '' };
     }
 
     // Fetch Records
@@ -154,7 +258,7 @@
         }
     }
 
-    // Filter Records (Instant Search & Category Filter)
+    // Filter Records
     function filterRecords() {
         const searchText = document.getElementById('searchInput').value.toLowerCase();
         const selectedCategory = document.getElementById('categoryFilter').value;
@@ -181,6 +285,8 @@
 
         records.forEach(record => {
             const row = document.createElement('tr');
+            const safeFileName = record.fileName ? record.fileName.replace(/'/g, "\\'") : '';
+            
             row.innerHTML = `
                 <td><span class="badge">${record.category}</span></td>
                 <td><strong>${record.title}</strong></td>
@@ -188,7 +294,7 @@
                 <td>${record.date}</td>
                 <td>
                     ${record.filePath && record.filePath !== '#' 
-                        ? `<a href="${record.filePath}" target="_blank" style="color:#003366; font-weight:bold;">📎 ${record.fileName}</a>` 
+                        ? `<span class="file-link" onclick="viewFile('${record.filePath}', '${safeFileName}')">📎 ${record.fileName}</span>` 
                         : '<span style="color:#aaa;">No File</span>'}
                 </td>
                 <td>
