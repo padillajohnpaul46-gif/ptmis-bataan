@@ -8,7 +8,7 @@ const sqlite3 = require('sqlite3').verbose();
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Force browser to NEVER cache old index.html files
+// Disable caching so clients always get the latest front-end code
 app.use((req, res, next) => {
     res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
     res.setHeader('Pragma', 'no-cache');
@@ -20,7 +20,7 @@ app.use(cors());
 app.use(express.json());
 app.use(express.static(__dirname));
 
-// Use /tmp/uploads for cloud host compatibility (Render)
+// Use /tmp/uploads for Render cloud disk environment
 const uploadDir = path.join('/tmp', 'uploads');
 if (!fs.existsSync(uploadDir)) {
     fs.mkdirSync(uploadDir, { recursive: true });
@@ -48,14 +48,14 @@ db.run(`
     )
 `);
 
-// Multer Storage Configuration
+// Multer Storage Setup
 const storage = multer.diskStorage({
     destination: (req, file, cb) => cb(null, uploadDir),
     filename: (req, file, cb) => cb(null, Date.now() + '-' + file.originalname)
 });
 const upload = multer({ 
     storage,
-    limits: { fileSize: 10 * 1024 * 1024 } // 10MB limit
+    limits: { fileSize: 10 * 1024 * 1024 } // 10MB file limit
 });
 
 // API Routes
@@ -102,7 +102,8 @@ app.delete('/api/records/:id', (req, res) => {
     });
 });
 
-app.get('*', (req, res) => {
+// ✅ Express 5 safe fallback catch-all route syntax:
+app.get('(.*)', (req, res) => {
     res.sendFile(path.join(__dirname, 'index.html'));
 });
 
